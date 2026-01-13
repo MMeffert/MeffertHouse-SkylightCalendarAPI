@@ -26,3 +26,8 @@ npm-debug.log*
 
 # TypeScript cache
 *.tsbuildinfo
+
+# Captured API traffic (may contain credentials)
+docs/captured-*.yaml
+docs/captured-*.json
+*.har
