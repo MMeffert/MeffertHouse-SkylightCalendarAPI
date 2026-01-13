@@ -60,7 +60,12 @@ export class SkylightClient {
           res.on("data", (chunk) => (data += chunk));
           res.on("end", () => {
             if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
-              resolve(JSON.parse(data) as T);
+              // Handle empty responses (e.g., DELETE returns 204 No Content)
+              if (!data || data.trim() === "") {
+                resolve(undefined as T);
+              } else {
+                resolve(JSON.parse(data) as T);
+              }
             } else {
               reject(new Error(`Skylight API error: ${res.statusCode} - ${data}`));
             }
@@ -114,6 +119,8 @@ export class SkylightClient {
     }
 
     // Transform to simplified Chore type
+    // Note: Skylight returns compound IDs like "123-2026-01-15" for recurring chore instances
+    // The resource.id is the canonical identifier for API operations
     return response.data.map((chore) => {
       const categoryId = chore.relationships?.category?.data?.id || null;
       return {

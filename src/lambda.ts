@@ -593,7 +593,7 @@ export async function handler(
                   const assignee = c.categoryLabel || "Unassigned";
                   const time = c.time ? ` at ${c.time}` : "";
                   const status = c.status === "complete" ? " [DONE]" : "";
-                  return `- ${c.date}${time}: ${c.summary} - ${assignee}${status}`;
+                  return `- [${c.id}] ${c.date}${time}: ${c.summary} - ${assignee}${status}`;
                 })
                 .join("\n");
               result = {
@@ -659,7 +659,7 @@ export async function handler(
                 content: [
                   {
                     type: "text",
-                    text: `Created chore: "${chore.summary}" on ${chore.date}${assignedMsg}`,
+                    text: `Created chore: "${chore.summary}" on ${chore.date}${assignedMsg}. Chore ID: ${chore.id}`,
                   },
                 ],
               };

@@ -13,22 +13,25 @@ const timeSchema = z.string().regex(/^\d{2}:\d{2}$/, "Time must be HH:MM format"
 
 /**
  * Register all Skylight tools with the MCP server
+ * Uses the new registerTool API to avoid deprecation warnings
  */
 export function registerTools(server: McpServer, client: SkylightClient): void {
   // ─────────────────────────────────────────────────────────────
   // list_chores - List chores for a date range
   // ─────────────────────────────────────────────────────────────
-  server.tool(
+  server.registerTool(
     "list_chores",
-    "List chores from the Skylight Calendar for a date range. Returns all chores including who they're assigned to.",
     {
-      after: dateSchema.describe("Start date (YYYY-MM-DD)"),
-      before: dateSchema.describe("End date (YYYY-MM-DD)"),
-      include_late: z
-        .boolean()
-        .optional()
-        .default(true)
-        .describe("Include overdue/late chores (default: true)"),
+      description: "List chores from the Skylight Calendar for a date range. Returns all chores including who they're assigned to.",
+      inputSchema: {
+        after: dateSchema.describe("Start date (YYYY-MM-DD)"),
+        before: dateSchema.describe("End date (YYYY-MM-DD)"),
+        include_late: z
+          .boolean()
+          .optional()
+          .default(true)
+          .describe("Include overdue/late chores (default: true)"),
+      },
     },
     async ({ after, before, include_late }) => {
       try {
@@ -45,14 +48,14 @@ export function registerTools(server: McpServer, client: SkylightClient): void {
           };
         }
 
-        // Format chores for readable output
+        // Format chores for readable output (include ID for update/delete operations)
         const choreList = chores
           .map((chore) => {
             const assignee = chore.categoryLabel || "Unassigned";
             const time = chore.time ? ` at ${chore.time}` : "";
             const status = chore.status === "complete" ? " [DONE]" : "";
             const recurring = chore.recurring ? " (recurring)" : "";
-            return `- ${chore.date}${time}: ${chore.summary} - ${assignee}${status}${recurring}`;
+            return `- [${chore.id}] ${chore.date}${time}: ${chore.summary} - ${assignee}${status}${recurring}`;
           })
           .join("\n");
 
@@ -81,24 +84,26 @@ export function registerTools(server: McpServer, client: SkylightClient): void {
   // ─────────────────────────────────────────────────────────────
   // create_chore - Create a new chore
   // ─────────────────────────────────────────────────────────────
-  server.tool(
+  server.registerTool(
     "create_chore",
-    "Create a new chore on the Skylight Calendar. Optionally assign to a family member by category ID.",
     {
-      summary: z.string().describe("The chore name/description"),
-      date: dateSchema.describe("Date for the chore (YYYY-MM-DD)"),
-      time: timeSchema.describe("Time for the chore (HH:MM, 24-hour)"),
-      category_id: z
-        .string()
-        .optional()
-        .describe(
-          "Category/family member ID to assign the chore to. Use list_categories to see available IDs."
-        ),
-      recurring: z
-        .boolean()
-        .optional()
-        .default(false)
-        .describe("Whether this is a recurring chore"),
+      description: "Create a new chore on the Skylight Calendar. Optionally assign to a family member by category ID.",
+      inputSchema: {
+        summary: z.string().describe("The chore name/description"),
+        date: dateSchema.describe("Date for the chore (YYYY-MM-DD)"),
+        time: timeSchema.describe("Time for the chore (HH:MM, 24-hour)"),
+        category_id: z
+          .string()
+          .optional()
+          .describe(
+            "Category/family member ID to assign the chore to. Use list_categories to see available IDs."
+          ),
+        recurring: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe("Whether this is a recurring chore"),
+      },
     },
     async ({ summary, date, time, category_id, recurring }) => {
       try {
@@ -138,13 +143,15 @@ export function registerTools(server: McpServer, client: SkylightClient): void {
   // ─────────────────────────────────────────────────────────────
   // complete_chore - Mark a chore as complete
   // ─────────────────────────────────────────────────────────────
-  server.tool(
+  server.registerTool(
     "complete_chore",
-    "Mark a chore as completed on the Skylight Calendar.",
     {
-      chore_id: z
-        .string()
-        .describe("The ID of the chore to mark as complete"),
+      description: "Mark a chore as completed on the Skylight Calendar.",
+      inputSchema: {
+        chore_id: z
+          .string()
+          .describe("The ID of the chore to mark as complete"),
+      },
     },
     async ({ chore_id }) => {
       try {
@@ -175,10 +182,12 @@ export function registerTools(server: McpServer, client: SkylightClient): void {
   // ─────────────────────────────────────────────────────────────
   // list_categories - List family members/categories
   // ─────────────────────────────────────────────────────────────
-  server.tool(
+  server.registerTool(
     "list_categories",
-    "List all categories (family members) available for assigning chores. Use these IDs when creating chores.",
-    {},
+    {
+      description: "List all categories (family members) available for assigning chores. Use these IDs when creating chores.",
+      inputSchema: {},
+    },
     async () => {
       try {
         const categories = await client.getCategories();
@@ -223,13 +232,15 @@ export function registerTools(server: McpServer, client: SkylightClient): void {
   // ─────────────────────────────────────────────────────────────
   // delete_chore - Delete a chore
   // ─────────────────────────────────────────────────────────────
-  server.tool(
+  server.registerTool(
     "delete_chore",
-    "Delete a chore from the Skylight Calendar.",
     {
-      chore_id: z
-        .string()
-        .describe("The ID of the chore to delete"),
+      description: "Delete a chore from the Skylight Calendar.",
+      inputSchema: {
+        chore_id: z
+          .string()
+          .describe("The ID of the chore to delete"),
+      },
     },
     async ({ chore_id }) => {
       try {
@@ -260,23 +271,25 @@ export function registerTools(server: McpServer, client: SkylightClient): void {
   // ─────────────────────────────────────────────────────────────
   // update_chore - Update an existing chore
   // ─────────────────────────────────────────────────────────────
-  server.tool(
+  server.registerTool(
     "update_chore",
-    "Update an existing chore on the Skylight Calendar. Only include fields you want to change.",
     {
-      chore_id: z.string().describe("The ID of the chore to update"),
-      summary: z.string().optional().describe("New name/description for the chore"),
-      date: dateSchema.optional().describe("New date (YYYY-MM-DD)"),
-      time: timeSchema.describe("New time (HH:MM, 24-hour)"),
-      category_id: z
-        .string()
-        .optional()
-        .describe("New category/family member ID or name to reassign the chore"),
-      status: z
-        .enum(["pending", "complete"])
-        .optional()
-        .describe("Change status (use 'pending' to un-complete a chore)"),
-      emoji_icon: z.string().optional().describe("Emoji icon for the chore (helps young kids)"),
+      description: "Update an existing chore on the Skylight Calendar. Only include fields you want to change.",
+      inputSchema: {
+        chore_id: z.string().describe("The ID of the chore to update"),
+        summary: z.string().optional().describe("New name/description for the chore"),
+        date: dateSchema.optional().describe("New date (YYYY-MM-DD)"),
+        time: timeSchema.describe("New time (HH:MM, 24-hour)"),
+        category_id: z
+          .string()
+          .optional()
+          .describe("New category/family member ID or name to reassign the chore"),
+        status: z
+          .enum(["pending", "complete"])
+          .optional()
+          .describe("Change status (use 'pending' to un-complete a chore)"),
+        emoji_icon: z.string().optional().describe("Emoji icon for the chore (helps young kids)"),
+      },
     },
     async ({ chore_id, summary, date, time, category_id, status, emoji_icon }) => {
       try {
