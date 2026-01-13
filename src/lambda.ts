@@ -3,6 +3,7 @@
  * Handles MCP protocol over HTTP via Lambda Function URL
  */
 
+import { timingSafeEqual } from "crypto";
 import {
   SecretsManagerClient,
   GetSecretValueCommand,
@@ -46,7 +47,7 @@ let cachedCredentials: {
 async function getCredentials() {
   if (cachedCredentials) return cachedCredentials;
 
-  const client = new SecretsManagerClient({ region: "us-east-1" });
+  const client = new SecretsManagerClient({});
   const secretArn = process.env.SECRET_ARN;
 
   if (!secretArn) {
@@ -380,7 +381,13 @@ export async function handler(
     const authHeader = event.headers["authorization"] || "";
     const providedKey = authHeader.replace(/^Bearer\s+/i, "");
 
-    if (providedKey !== credentials.apiKey) {
+    // Timing-safe comparison to prevent timing attacks
+    const providedKeyBuf = Buffer.from(providedKey);
+    const apiKeyBuf = Buffer.from(credentials.apiKey);
+    const keysMatch = providedKeyBuf.length === apiKeyBuf.length &&
+      timingSafeEqual(providedKeyBuf, apiKeyBuf);
+
+    if (!keysMatch) {
       return {
         statusCode: 401,
         headers,
@@ -395,7 +402,16 @@ export async function handler(
       ? Buffer.from(event.body || "", "base64").toString("utf-8")
       : event.body || "";
 
-    const request = JSON.parse(body);
+    let request;
+    try {
+      request = JSON.parse(body);
+    } catch {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify(jsonRpcError(null, -32700, "Parse error: Invalid JSON")),
+      };
+    }
 
     // Handle MCP protocol messages
     const { skylightClient: client } = await getMcpServer();
@@ -565,9 +581,6 @@ export async function handler(
             }
 
             case "create_chore": {
-              // Debug: log incoming arguments
-              console.log("create_chore called with args:", JSON.stringify(toolArgs));
-
               // Resolve category_id - could be numeric ID or family member name
               let resolvedCategoryId = toolArgs.category_id;
               let categoryName: string | null = null;

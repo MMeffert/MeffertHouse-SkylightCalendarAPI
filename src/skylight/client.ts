@@ -25,8 +25,6 @@ export class SkylightClient {
   constructor(config: SkylightClientConfig) {
     this.authToken = config.authToken;
     this.frameId = config.frameId;
-    // Debug: log auth token format (first 10 chars only for security)
-    console.log(`SkylightClient initialized - authToken starts with: "${this.authToken?.substring(0, 10)}..."`);
   }
 
   private async request<T>(
@@ -48,10 +46,6 @@ export class SkylightClient {
       headers["Content-Length"] = Buffer.byteLength(bodyStr).toString();
     }
 
-    // Debug: log full request details
-    const debugHeaders = { ...headers, Authorization: headers.Authorization?.substring(0, 15) + "..." };
-    console.log(`Skylight API ${method} ${path}`, JSON.stringify({ headers: debugHeaders, body: bodyStr }));
-
     return new Promise((resolve, reject) => {
       const req = https.request(
         `${BASE_URL}${path}`,
@@ -63,7 +57,6 @@ export class SkylightClient {
           let data = "";
           res.on("data", (chunk) => (data += chunk));
           res.on("end", () => {
-            console.log(`Skylight API response: ${res.statusCode} ${data.substring(0, 500)}`);
             if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
               resolve(JSON.parse(data) as T);
             } else {
@@ -73,10 +66,7 @@ export class SkylightClient {
         }
       );
 
-      req.on("error", (err) => {
-        console.log(`Skylight API request error: ${err.message}`);
-        reject(err);
-      });
+      req.on("error", reject);
 
       if (bodyStr) {
         req.write(bodyStr);
@@ -378,7 +368,7 @@ export class SkylightClient {
    */
   async deleteChore(choreId: string, applyTo?: "one" | "all" | "future"): Promise<void> {
     const query = applyTo ? `?apply_to=${applyTo}` : "";
-    await this.request<string>(
+    await this.request<void>(
       "DELETE",
       `/api/frames/${this.frameId}/chores/${choreId}${query}`
     );

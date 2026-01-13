@@ -85,6 +85,4 @@ AWS_PROFILE=personal aws logs tail /aws/lambda/SkylightMcpStack-SkylightMcpFunct
 
 1. **In-memory OAuth codes** (`lambda.ts:77`) - Auth codes stored in `Map` won't persist across Lambda instances. Production fix: use DynamoDB with TTL.
 
-2. **Duplicate tool definitions** - Tools defined in both `lambda.ts:425-522` (for `tools/list`) and `tools/index.ts` (SDK registration). The `update_chore` tool exists only in lambda.ts.
-
-3. **Debug logging** - `client.ts` logs partial auth tokens and request bodies. Should be removed for production.
+2. **Duplicate tool definitions** - Tools defined in both `lambda.ts` (for `tools/list` response) and `tools/index.ts` (SDK registration). These should be consolidated to a single source of truth.

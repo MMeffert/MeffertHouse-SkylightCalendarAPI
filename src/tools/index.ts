@@ -260,4 +260,66 @@ export function registerTools(server: McpServer, client: SkylightClient): void {
       }
     }
   );
+
+  // ─────────────────────────────────────────────────────────────
+  // update_chore - Update an existing chore
+  // ─────────────────────────────────────────────────────────────
+  server.tool(
+    "update_chore",
+    "Update an existing chore on the Skylight Calendar. Only include fields you want to change.",
+    {
+      chore_id: z.string().describe("The ID of the chore to update"),
+      summary: z.string().optional().describe("New name/description for the chore"),
+      date: z.string().optional().describe("New date in YYYY-MM-DD format"),
+      time: z.string().optional().describe("New time in HH:MM format (24-hour)"),
+      category_id: z
+        .string()
+        .optional()
+        .describe("New category/family member ID or name to reassign the chore"),
+      status: z
+        .enum(["pending", "complete"])
+        .optional()
+        .describe("Change status (use 'pending' to un-complete a chore)"),
+      emoji_icon: z.string().optional().describe("Emoji icon for the chore (helps young kids)"),
+    },
+    async ({ chore_id, summary, date, time, category_id, status, emoji_icon }) => {
+      try {
+        const chore = await client.updateChore(chore_id, {
+          summary,
+          date,
+          time,
+          categoryId: category_id,
+          status,
+          emojiIcon: emoji_icon,
+        });
+
+        const changes: string[] = [];
+        if (summary) changes.push(`name to "${summary}"`);
+        if (date) changes.push(`date to ${date}`);
+        if (time) changes.push(`time to ${time}`);
+        if (category_id) changes.push(`assignee to ${chore.categoryLabel || category_id}`);
+        if (emoji_icon) changes.push(`icon to ${emoji_icon}`);
+        if (status) changes.push(`status to ${status}`);
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Updated chore: changed ${changes.join(", ")}`,
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Error updating chore: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
 }
