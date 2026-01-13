@@ -23,7 +23,7 @@ export class SkylightMcpStack extends cdk.Stack {
 
     // Lambda function
     const mcpFunction = new nodejs.NodejsFunction(this, "SkylightMcpFunction", {
-      runtime: lambda.Runtime.NODEJS_20_X,
+      runtime: lambda.Runtime.NODEJS_22_X,
       handler: "handler",
       entry: path.join(__dirname, "../src/lambda.ts"),
       timeout: cdk.Duration.seconds(30),
@@ -35,7 +35,7 @@ export class SkylightMcpStack extends cdk.Stack {
       bundling: {
         minify: true,
         sourceMap: true,
-        target: "node20",
+        target: "node22",
         format: nodejs.OutputFormat.ESM,
         mainFields: ["module", "main"],
         esbuildArgs: {
