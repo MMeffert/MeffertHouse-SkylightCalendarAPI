@@ -70,11 +70,16 @@ AWS_PROFILE=personal aws logs tail /aws/lambda/SkylightMcpStack-SkylightMcpFunct
 - PUT requests for updates also use flat JSON body
 - Auth header: `Basic {token}` (captured via Proxyman from mobile app)
 - `recurrence_set` must be an array of RRULE strings: `["FREQ=WEEKLY;BYDAY=MO,WE,FR"]`
+- Chore ID formats:
+  - One-time chores: `61009429`
+  - Recurring (date): `31709442-2026-01-13`
+  - Recurring (time): `34163486-2026-01-13-2000`
 
 ## AWS Configuration
 
 - **Account:** 241654197557 (personal)
 - **Region:** us-east-1
+- **Runtime:** Node.js 24 (Lambda)
 - **Secret:** `skylight-mcp/credentials` contains:
   - `SKYLIGHT_AUTH_TOKEN` - Skylight auth token
   - `SKYLIGHT_FRAME_ID` - Household frame ID
