@@ -7,6 +7,10 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { SkylightClient } from "../skylight/client.js";
 
+// Reusable date schema with format validation
+const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD format");
+const timeSchema = z.string().regex(/^\d{2}:\d{2}$/, "Time must be HH:MM format").optional();
+
 /**
  * Register all Skylight tools with the MCP server
  */
@@ -18,12 +22,8 @@ export function registerTools(server: McpServer, client: SkylightClient): void {
     "list_chores",
     "List chores from the Skylight Calendar for a date range. Returns all chores including who they're assigned to.",
     {
-      after: z
-        .string()
-        .describe("Start date in YYYY-MM-DD format (e.g., 2025-01-12)"),
-      before: z
-        .string()
-        .describe("End date in YYYY-MM-DD format (e.g., 2025-01-19)"),
+      after: dateSchema.describe("Start date (YYYY-MM-DD)"),
+      before: dateSchema.describe("End date (YYYY-MM-DD)"),
       include_late: z
         .boolean()
         .optional()
@@ -50,8 +50,7 @@ export function registerTools(server: McpServer, client: SkylightClient): void {
           .map((chore) => {
             const assignee = chore.categoryLabel || "Unassigned";
             const time = chore.time ? ` at ${chore.time}` : "";
-            const status =
-              chore.status === "completed" ? " [COMPLETED]" : "";
+            const status = chore.status === "complete" ? " [DONE]" : "";
             const recurring = chore.recurring ? " (recurring)" : "";
             return `- ${chore.date}${time}: ${chore.summary} - ${assignee}${status}${recurring}`;
           })
@@ -87,11 +86,8 @@ export function registerTools(server: McpServer, client: SkylightClient): void {
     "Create a new chore on the Skylight Calendar. Optionally assign to a family member by category ID.",
     {
       summary: z.string().describe("The chore name/description"),
-      date: z.string().describe("Date for the chore in YYYY-MM-DD format"),
-      time: z
-        .string()
-        .optional()
-        .describe("Time for the chore in HH:MM format (24-hour)"),
+      date: dateSchema.describe("Date for the chore (YYYY-MM-DD)"),
+      time: timeSchema.describe("Time for the chore (HH:MM, 24-hour)"),
       category_id: z
         .string()
         .optional()
@@ -270,8 +266,8 @@ export function registerTools(server: McpServer, client: SkylightClient): void {
     {
       chore_id: z.string().describe("The ID of the chore to update"),
       summary: z.string().optional().describe("New name/description for the chore"),
-      date: z.string().optional().describe("New date in YYYY-MM-DD format"),
-      time: z.string().optional().describe("New time in HH:MM format (24-hour)"),
+      date: dateSchema.optional().describe("New date (YYYY-MM-DD)"),
+      time: timeSchema.describe("New time (HH:MM, 24-hour)"),
       category_id: z
         .string()
         .optional()

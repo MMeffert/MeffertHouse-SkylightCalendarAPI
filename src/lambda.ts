@@ -12,6 +12,15 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { SkylightClient } from "./skylight/client.js";
 import { registerTools } from "./tools/index.js";
 
+// Constants
+const AUTH_CODE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const ACCESS_TOKEN_TTL_SECONDS = 31536000; // 1 year
+const ALLOWED_REDIRECT_HOSTS = [
+  "claude.ai",
+  "localhost",
+  "127.0.0.1",
+];
+
 // Types for Lambda Function URL events
 interface LambdaFunctionUrlEvent {
   version: string;
@@ -117,15 +126,33 @@ async function handleOAuthAuthorize(
     };
   }
 
+  // Validate redirect URI against allowlist
+  try {
+    const redirectHost = new URL(redirectUri).hostname;
+    if (!ALLOWED_REDIRECT_HOSTS.some(h => redirectHost === h || redirectHost.endsWith(`.${h}`))) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: "invalid_redirect_uri" }),
+      };
+    }
+  } catch {
+    return {
+      statusCode: 400,
+      headers,
+      body: JSON.stringify({ error: "invalid_redirect_uri" }),
+    };
+  }
+
   // Generate authorization code
   const code = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64url");
 
-  // Store code with PKCE challenge (expires in 10 minutes)
+  // Store code with PKCE challenge
   authCodes.set(code, {
     codeChallenge,
     clientId,
     redirectUri,
-    expiresAt: Date.now() + 10 * 60 * 1000,
+    expiresAt: Date.now() + AUTH_CODE_TTL_MS,
   });
 
   // Auto-approve and redirect back with code
@@ -250,7 +277,7 @@ async function handleOAuthToken(
       body: JSON.stringify({
         access_token: credentials.apiKey,
         token_type: "Bearer",
-        expires_in: 31536000,
+        expires_in: ACCESS_TOKEN_TTL_SECONDS,
       }),
     };
   }
@@ -277,7 +304,7 @@ async function handleOAuthToken(
       body: JSON.stringify({
         access_token: credentials.apiKey,
         token_type: "Bearer",
-        expires_in: 31536000,
+        expires_in: ACCESS_TOKEN_TTL_SECONDS,
       }),
     };
   }
@@ -415,6 +442,9 @@ export async function handler(
 
     // Handle MCP protocol messages
     const { skylightClient: client } = await getMcpServer();
+    if (!client) {
+      throw new Error("Failed to initialize Skylight client");
+    }
 
     // Handle different MCP methods
     switch (request.method) {
@@ -553,7 +583,7 @@ export async function handler(
         try {
           switch (toolName) {
             case "list_chores": {
-              const chores = await client!.getChores(
+              const chores = await client.getChores(
                 toolArgs.after,
                 toolArgs.before,
                 toolArgs.include_late ?? true
@@ -590,7 +620,7 @@ export async function handler(
                 const isNumeric = /^\d+$/.test(toolArgs.category_id);
                 if (!isNumeric) {
                   // It's a name, look up the ID
-                  const categories = await client!.getCategories();
+                  const categories = await client.getCategories();
                   const matchedCategory = categories.find(
                     (c) => c.label.toLowerCase() === toolArgs.category_id.toLowerCase()
                   );
@@ -614,7 +644,7 @@ export async function handler(
               }
 
               // Use native https with exact mobile app headers
-              const chore = await client!.createChore({
+              const chore = await client.createChore({
                 summary: toolArgs.summary,
                 date: toolArgs.date,
                 time: toolArgs.time,
@@ -637,7 +667,7 @@ export async function handler(
             }
 
             case "complete_chore": {
-              const chore = await client!.completeChore(toolArgs.chore_id);
+              const chore = await client.completeChore(toolArgs.chore_id);
               result = {
                 content: [
                   {
@@ -650,7 +680,7 @@ export async function handler(
             }
 
             case "delete_chore": {
-              await client!.deleteChore(toolArgs.chore_id, toolArgs.apply_to);
+              await client.deleteChore(toolArgs.chore_id, toolArgs.apply_to);
               const applyMsg = toolArgs.apply_to ? ` (${toolArgs.apply_to})` : "";
               result = {
                 content: [
@@ -664,7 +694,7 @@ export async function handler(
               // Resolve category_id if it's a name
               let resolvedCategoryId = toolArgs.category_id;
               if (toolArgs.category_id && !/^\d+$/.test(toolArgs.category_id)) {
-                const categories = await client!.getCategories();
+                const categories = await client.getCategories();
                 const matched = categories.find(
                   (c) => c.label.toLowerCase() === toolArgs.category_id.toLowerCase()
                 );
@@ -682,7 +712,7 @@ export async function handler(
                 }
               }
 
-              const chore = await client!.updateChore(toolArgs.chore_id, {
+              const chore = await client.updateChore(toolArgs.chore_id, {
                 summary: toolArgs.summary,
                 date: toolArgs.date,
                 time: toolArgs.time,
@@ -709,7 +739,7 @@ export async function handler(
             }
 
             case "list_categories": {
-              const categories = await client!.getCategories();
+              const categories = await client.getCategories();
               const catList = categories
                 .map((c) => `- ${c.label} (ID: ${c.id})`)
                 .join("\n");

@@ -12,6 +12,7 @@ import {
 } from "./types.js";
 
 const BASE_URL = "https://app.ourskylight.com";
+const REQUEST_TIMEOUT_MS = 15000; // 15 seconds
 
 export interface SkylightClientConfig {
   authToken: string;
@@ -52,6 +53,7 @@ export class SkylightClient {
         {
           method,
           headers,
+          timeout: REQUEST_TIMEOUT_MS,
         },
         (res) => {
           let data = "";
@@ -66,6 +68,10 @@ export class SkylightClient {
         }
       );
 
+      req.on("timeout", () => {
+        req.destroy();
+        reject(new Error(`Skylight API timeout after ${REQUEST_TIMEOUT_MS}ms`));
+      });
       req.on("error", reject);
 
       if (bodyStr) {
