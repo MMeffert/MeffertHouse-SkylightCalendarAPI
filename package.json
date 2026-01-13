@@ -1,0 +1,38 @@
+{
+  "name": "skylight-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for Skylight Calendar chore management",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "cdk:synth": "cdk synth",
+    "cdk:diff": "cdk diff",
+    "cdk:deploy": "cdk deploy --require-approval never",
+    "cdk:destroy": "cdk destroy"
+  },
+  "keywords": [
+    "mcp",
+    "skylight",
+    "calendar",
+    "chores"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.967.0",
+    "@modelcontextprotocol/sdk": "^1.25.2",
+    "aws-cdk-lib": "^2.234.1",
+    "constructs": "^10.4.4",
+    "esbuild": "^0.27.2",
+    "zod": "^4.3.5"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.7",
+    "aws-cdk": "^2.234.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
