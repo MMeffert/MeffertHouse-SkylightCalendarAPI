@@ -22,16 +22,16 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@aws-sdk/client-secrets-manager": "^3.967.0",
-    "@modelcontextprotocol/sdk": "^1.25.2",
-    "aws-cdk-lib": "^2.234.1",
-    "constructs": "^10.4.4",
+    "@aws-sdk/client-secrets-manager": "^3.975.0",
+    "@modelcontextprotocol/sdk": "^1.25.3",
+    "aws-cdk-lib": "^2.236.0",
+    "constructs": "^10.4.5",
     "esbuild": "^0.27.2",
-    "zod": "^4.3.5"
+    "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@types/node": "^25.0.7",
-    "aws-cdk": "^2.234.1",
+    "@types/node": "^25.0.10",
+    "aws-cdk": "^2.1103.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }
