@@ -23,7 +23,7 @@
   "license": "MIT",
   "dependencies": {
     "@aws-sdk/client-secrets-manager": "^3.980.0",
-    "@modelcontextprotocol/sdk": "^1.25.3",
+    "@modelcontextprotocol/sdk": "^1.26.0",
     "aws-cdk-lib": "^2.236.0",
     "constructs": "^10.4.5",
     "esbuild": "^0.27.2",
