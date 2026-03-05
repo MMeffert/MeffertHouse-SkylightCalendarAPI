@@ -51,6 +51,7 @@ let cachedCredentials: {
   apiKey: string;
   oauthClientId: string;
   oauthClientSecret: string;
+  oauthPin: string | null;
 } | null = null;
 
 async function getCredentials() {
@@ -78,6 +79,7 @@ async function getCredentials() {
     apiKey: secret.MCP_API_KEY,
     oauthClientId: secret.OAUTH_CLIENT_ID || "skylight-mcp",
     oauthClientSecret: secret.OAUTH_CLIENT_SECRET || secret.MCP_API_KEY,
+    oauthPin: secret.OAUTH_PIN || null,
   };
 
   return cachedCredentials;
@@ -86,62 +88,120 @@ async function getCredentials() {
 // Simple in-memory store for PKCE codes (in production, use DynamoDB or similar)
 const authCodes: Map<string, { codeChallenge: string; clientId: string; redirectUri: string; expiresAt: number }> = new Map();
 
+// HTML helpers for consent page
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+}
+
+function renderConsentPage(params: {
+  responseType: string; clientId: string; redirectUri: string;
+  codeChallenge: string; codeChallengeMethod: string; state: string | null;
+  error?: string;
+}): string {
+  const e = escapeHtml;
+  const errorHtml = params.error ? `<p class="error">${e(params.error)}</p>` : "";
+  const stateField = params.state
+    ? `<input type="hidden" name="state" value="${e(params.state)}">`
+    : "";
+  return `<!DOCTYPE html><html><head><title>Skylight MCP - Authorize</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>body{font-family:-apple-system,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;background:#f5f5f5}
+.card{background:#fff;padding:2rem;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.1);max-width:360px;width:100%}
+h1{font-size:1.25rem;margin:0 0 .5rem}p{color:#666;font-size:.9rem;margin:0 0 1.5rem}
+input[type=password]{width:100%;padding:.75rem;border:1px solid #ddd;border-radius:8px;font-size:1rem;box-sizing:border-box}
+button{width:100%;padding:.75rem;background:#2563eb;color:#fff;border:none;border-radius:8px;font-size:1rem;cursor:pointer;margin-top:1rem}
+button:hover{background:#1d4ed8}.error{color:#dc2626;font-size:.85rem;margin-top:.5rem}</style></head>
+<body><div class="card"><h1>Skylight Calendar</h1>
+<p>Enter your PIN to authorize MCP access.</p>
+<form method="POST" action="/authorize">
+<input type="hidden" name="response_type" value="${e(params.responseType)}">
+<input type="hidden" name="client_id" value="${e(params.clientId)}">
+<input type="hidden" name="redirect_uri" value="${e(params.redirectUri)}">
+<input type="hidden" name="code_challenge" value="${e(params.codeChallenge)}">
+<input type="hidden" name="code_challenge_method" value="${e(params.codeChallengeMethod)}">
+${stateField}
+<input type="password" name="pin" placeholder="Enter PIN" required autofocus>
+${errorHtml}
+<button type="submit">Authorize</button>
+</form></div></body></html>`;
+}
+
 // Handle OAuth authorize endpoint (Authorization Code flow with PKCE)
 async function handleOAuthAuthorize(
   event: LambdaFunctionUrlEvent,
   headers: Record<string, string>
 ): Promise<LambdaFunctionUrlResponse> {
   const credentials = await getCredentials();
-  const params = new URLSearchParams(event.rawQueryString);
+  const method = event.requestContext.http.method;
 
-  const responseType = params.get("response_type");
-  const clientId = params.get("client_id");
-  const redirectUri = params.get("redirect_uri");
-  const codeChallenge = params.get("code_challenge");
-  const codeChallengeMethod = params.get("code_challenge_method");
+  // Parse params from query string (GET) or form body (POST)
+  let params: URLSearchParams;
+  if (method === "POST") {
+    const body = event.isBase64Encoded
+      ? Buffer.from(event.body || "", "base64").toString("utf-8")
+      : event.body || "";
+    params = new URLSearchParams(body);
+  } else {
+    params = new URLSearchParams(event.rawQueryString);
+  }
+
+  const responseType = params.get("response_type") || "";
+  const clientId = params.get("client_id") || "";
+  const redirectUri = params.get("redirect_uri") || "";
+  const codeChallenge = params.get("code_challenge") || "";
+  const codeChallengeMethod = params.get("code_challenge_method") || "";
   const state = params.get("state");
 
   // Validate required params
   if (responseType !== "code") {
-    return {
-      statusCode: 400,
-      headers,
-      body: JSON.stringify({ error: "unsupported_response_type" }),
-    };
+    return { statusCode: 400, headers, body: JSON.stringify({ error: "unsupported_response_type" }) };
   }
 
   if (clientId !== credentials.oauthClientId) {
-    return {
-      statusCode: 400,
-      headers,
-      body: JSON.stringify({ error: "invalid_client" }),
-    };
+    return { statusCode: 400, headers, body: JSON.stringify({ error: "invalid_client" }) };
   }
 
   if (!redirectUri || !codeChallenge || codeChallengeMethod !== "S256") {
-    return {
-      statusCode: 400,
-      headers,
-      body: JSON.stringify({ error: "invalid_request" }),
-    };
+    return { statusCode: 400, headers, body: JSON.stringify({ error: "invalid_request" }) };
   }
 
   // Validate redirect URI against allowlist
   try {
     const redirectHost = new URL(redirectUri).hostname;
     if (!ALLOWED_REDIRECT_HOSTS.some(h => redirectHost === h || redirectHost.endsWith(`.${h}`))) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: "invalid_redirect_uri" }),
-      };
+      return { statusCode: 400, headers, body: JSON.stringify({ error: "invalid_redirect_uri" }) };
     }
   } catch {
-    return {
-      statusCode: 400,
-      headers,
-      body: JSON.stringify({ error: "invalid_redirect_uri" }),
-    };
+    return { statusCode: 400, headers, body: JSON.stringify({ error: "invalid_redirect_uri" }) };
+  }
+
+  // If PIN is configured, require interactive approval
+  if (credentials.oauthPin) {
+    const consentParams = { responseType, clientId, redirectUri, codeChallenge, codeChallengeMethod, state };
+
+    if (method === "GET") {
+      return {
+        statusCode: 200,
+        headers: { ...headers, "Content-Type": "text/html; charset=utf-8" },
+        body: renderConsentPage(consentParams),
+      };
+    }
+
+    // POST - validate PIN with timing-safe comparison
+    const pin = params.get("pin") || "";
+    const pinBuf = Buffer.from(pin);
+    const expectedBuf = Buffer.from(credentials.oauthPin);
+    const pinMatch = pinBuf.length === expectedBuf.length && timingSafeEqual(pinBuf, expectedBuf);
+
+    if (!pinMatch) {
+      return {
+        statusCode: 200,
+        headers: { ...headers, "Content-Type": "text/html; charset=utf-8" },
+        body: renderConsentPage({ ...consentParams, error: "Invalid PIN" }),
+      };
+    }
+  } else {
+    console.warn("OAUTH_PIN not set in secrets - auto-approving OAuth requests. Set OAUTH_PIN for security.");
   }
 
   // Generate authorization code
@@ -155,17 +215,14 @@ async function handleOAuthAuthorize(
     expiresAt: Date.now() + AUTH_CODE_TTL_MS,
   });
 
-  // Auto-approve and redirect back with code
+  // Redirect back with code
   const redirectUrl = new URL(redirectUri);
   redirectUrl.searchParams.set("code", code);
   if (state) redirectUrl.searchParams.set("state", state);
 
   return {
     statusCode: 302,
-    headers: {
-      ...headers,
-      Location: redirectUrl.toString(),
-    },
+    headers: { ...headers, Location: redirectUrl.toString() },
     body: "",
   };
 }
@@ -244,6 +301,22 @@ async function handleOAuthToken(
         body: JSON.stringify({
           error: "invalid_grant",
           error_description: "Invalid or expired authorization code",
+        }),
+      };
+    }
+
+    // Verify redirect_uri matches the one from /authorize
+    const providedRedirectUri = contentType.includes("application/x-www-form-urlencoded")
+      ? new URLSearchParams(body).get("redirect_uri")
+      : (() => { try { return JSON.parse(body).redirect_uri; } catch { return undefined; } })();
+    if (providedRedirectUri && providedRedirectUri !== storedCode.redirectUri) {
+      authCodes.delete(code);
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({
+          error: "invalid_grant",
+          error_description: "redirect_uri mismatch",
         }),
       };
     }
@@ -383,8 +456,8 @@ export async function handler(
   const path = event.rawPath || "/";
   const method = event.requestContext.http.method;
 
-  // Handle OAuth authorize endpoint (GET)
-  if (path === "/authorize" && method === "GET") {
+  // Handle OAuth authorize endpoint (GET = consent page, POST = PIN validation)
+  if (path === "/authorize" && (method === "GET" || method === "POST")) {
     return handleOAuthAuthorize(event, headers);
   }
 
@@ -849,6 +922,14 @@ export async function handler(
           body: JSON.stringify(jsonRpcResponse(request.id, result)),
         };
 
+      case "notifications/initialized":
+        // MCP notification - acknowledge without error
+        return {
+          statusCode: 200,
+          headers,
+          body: "",
+        };
+
       default:
         return {
           statusCode: 200,
@@ -864,11 +945,7 @@ export async function handler(
       statusCode: 500,
       headers,
       body: JSON.stringify(
-        jsonRpcError(
-          null,
-          -32000,
-          `Server error: ${error instanceof Error ? error.message : String(error)}`
-        )
+        jsonRpcError(null, -32000, "Internal server error")
       ),
     };
   }
