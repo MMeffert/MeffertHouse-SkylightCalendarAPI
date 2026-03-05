@@ -168,7 +168,7 @@ async function handleOAuthAuthorize(
   // Validate redirect URI against allowlist
   try {
     const redirectHost = new URL(redirectUri).hostname;
-    if (!ALLOWED_REDIRECT_HOSTS.some(h => redirectHost === h || redirectHost.endsWith(`.${h}`))) {
+    if (!ALLOWED_REDIRECT_HOSTS.includes(redirectHost)) {
       return { statusCode: 400, headers, body: JSON.stringify({ error: "invalid_redirect_uri" }) };
     }
   } catch {
@@ -273,12 +273,25 @@ async function handleOAuthToken(
 
   // Handle authorization_code grant (PKCE flow from Claude Web)
   if (grantType === "authorization_code") {
-    const code = contentType.includes("application/x-www-form-urlencoded")
-      ? new URLSearchParams(body).get("code")
-      : JSON.parse(body).code;
-    const codeVerifier = contentType.includes("application/x-www-form-urlencoded")
-      ? new URLSearchParams(body).get("code_verifier")
-      : JSON.parse(body).code_verifier;
+    let code: string | null = null;
+    let codeVerifier: string | null = null;
+    if (contentType.includes("application/x-www-form-urlencoded")) {
+      const params = new URLSearchParams(body);
+      code = params.get("code");
+      codeVerifier = params.get("code_verifier");
+    } else {
+      try {
+        const json = JSON.parse(body);
+        code = json.code || null;
+        codeVerifier = json.code_verifier || null;
+      } catch {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: "invalid_request", error_description: "Invalid JSON body" }),
+        };
+      }
+    }
 
     if (!code || !codeVerifier) {
       return {
@@ -308,7 +321,7 @@ async function handleOAuthToken(
     // Verify redirect_uri matches the one from /authorize
     const providedRedirectUri = contentType.includes("application/x-www-form-urlencoded")
       ? new URLSearchParams(body).get("redirect_uri")
-      : (() => { try { return JSON.parse(body).redirect_uri; } catch { return undefined; } })();
+      : (() => { try { return JSON.parse(body).redirect_uri; } catch { return null; } })();
     if (providedRedirectUri && providedRedirectUri !== storedCode.redirectUri) {
       authCodes.delete(code);
       return {
