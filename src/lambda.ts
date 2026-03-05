@@ -393,6 +393,71 @@ export async function handler(
     return handleOAuthToken(event, headers);
   }
 
+  // OAuth Authorization Server Metadata (RFC 8414)
+  if (path === "/.well-known/oauth-authorization-server" && method === "GET") {
+    const baseUrl = `https://${event.headers["host"]}`;
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        issuer: baseUrl,
+        authorization_endpoint: `${baseUrl}/authorize`,
+        token_endpoint: `${baseUrl}/token`,
+        registration_endpoint: `${baseUrl}/register`,
+        response_types_supported: ["code"],
+        grant_types_supported: ["authorization_code"],
+        code_challenge_methods_supported: ["S256"],
+        token_endpoint_auth_methods_supported: ["none"],
+      }),
+    };
+  }
+
+  // OAuth Protected Resource Metadata
+  if (path === "/.well-known/oauth-protected-resource" && method === "GET") {
+    const baseUrl = `https://${event.headers["host"]}`;
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        resource: baseUrl,
+        authorization_servers: [baseUrl],
+        bearer_methods_supported: ["header"],
+      }),
+    };
+  }
+
+  // Dynamic Client Registration (RFC 7591)
+  if (path === "/register" && method === "POST") {
+    const reqBody = event.isBase64Encoded
+      ? Buffer.from(event.body || "", "base64").toString("utf-8")
+      : event.body || "";
+
+    let clientMetadata;
+    try {
+      clientMetadata = JSON.parse(reqBody);
+    } catch {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: "invalid_request" }),
+      };
+    }
+
+    const credentials = await getCredentials();
+    return {
+      statusCode: 201,
+      headers,
+      body: JSON.stringify({
+        client_id: credentials.oauthClientId,
+        client_name: clientMetadata.client_name || "MCP Client",
+        redirect_uris: clientMetadata.redirect_uris || [],
+        grant_types: ["authorization_code"],
+        response_types: ["code"],
+        token_endpoint_auth_method: "none",
+      }),
+    };
+  }
+
   // Only accept POST for MCP endpoints
   if (method !== "POST") {
     return {
@@ -415,9 +480,13 @@ export async function handler(
       timingSafeEqual(providedKeyBuf, apiKeyBuf);
 
     if (!keysMatch) {
+      const baseUrl = `https://${event.headers["host"]}`;
       return {
         statusCode: 401,
-        headers,
+        headers: {
+          ...headers,
+          "WWW-Authenticate": `Bearer resource_metadata="${baseUrl}/.well-known/oauth-protected-resource"`,
+        },
         body: JSON.stringify(
           jsonRpcError(null, -32001, "Unauthorized: Invalid API key")
         ),
