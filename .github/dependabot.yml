@@ -20,3 +20,7 @@ updates:
       day: "sunday"
     labels:
       - "dependencies"
+    groups:
+      all-actions:
+        patterns:
+          - "*"
