@@ -20,6 +20,9 @@ cdk.out/
 # Claude Code local settings
 .claude/settings.local.json
 
+# MCP client config (contains deployment-specific URLs)
+.mcp.json
+
 # Logs
 *.log
 npm-debug.log*
