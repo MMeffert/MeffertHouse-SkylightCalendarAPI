@@ -15,18 +15,11 @@ jobs:
         id: metadata
         uses: dependabot/fetch-metadata@v3
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
 
-      - name: Approve PR
+      - name: Auto-merge minor/patch updates
         if: steps.metadata.outputs.update-type != 'version-update:semver-major'
-        run: gh pr review --approve "$PR_URL"
-        env:
-          PR_URL: ${{ github.event.pull_request.html_url }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Enable auto-merge
-        if: steps.metadata.outputs.update-type != 'version-update:semver-major'
-        run: gh pr merge --squash --auto "$PR_URL"
+        run: gh pr merge --auto --squash "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
