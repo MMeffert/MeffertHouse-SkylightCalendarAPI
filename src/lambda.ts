@@ -15,6 +15,7 @@ import { registerTools } from "./tools/index.js";
 // Constants
 const AUTH_CODE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const ACCESS_TOKEN_TTL_SECONDS = 31536000; // 1 year
+const CREDENTIALS_TTL_MS = 5 * 60 * 1000; // 5 minutes - lets secret rotations take effect without cold-start
 const ALLOWED_REDIRECT_HOSTS = [
   "claude.ai",
   "localhost",
@@ -44,7 +45,9 @@ interface LambdaFunctionUrlResponse {
   body: string;
 }
 
-// Cache secrets to avoid repeated API calls
+// Cache secrets to avoid repeated API calls. TTL lets secret rotations take effect
+// without needing to recycle the Lambda. Derived clients (SkylightClient, McpServer)
+// are invalidated below when the Skylight token actually changes.
 let cachedCredentials: {
   authToken: string;
   frameId: string;
@@ -52,10 +55,13 @@ let cachedCredentials: {
   oauthClientId: string;
   oauthClientSecret: string;
   oauthPin: string | null;
+  fetchedAt: number;
 } | null = null;
 
 async function getCredentials() {
-  if (cachedCredentials) return cachedCredentials;
+  if (cachedCredentials && Date.now() - cachedCredentials.fetchedAt < CREDENTIALS_TTL_MS) {
+    return cachedCredentials;
+  }
 
   const client = new SecretsManagerClient({});
   const secretArn = process.env.SECRET_ARN;
@@ -73,15 +79,27 @@ async function getCredentials() {
   }
 
   const secret = JSON.parse(response.SecretString);
-  cachedCredentials = {
+  const fresh = {
     authToken: secret.SKYLIGHT_AUTH_TOKEN,
     frameId: secret.SKYLIGHT_FRAME_ID,
     apiKey: secret.MCP_API_KEY,
     oauthClientId: secret.OAUTH_CLIENT_ID || "skylight-mcp",
     oauthClientSecret: secret.OAUTH_CLIENT_SECRET || secret.MCP_API_KEY,
     oauthPin: secret.OAUTH_PIN || null,
+    fetchedAt: Date.now(),
   };
 
+  // If Skylight credentials changed, drop the SkylightClient/McpServer singletons
+  // so the next request rebuilds them with the new token.
+  if (cachedCredentials && (
+    cachedCredentials.authToken !== fresh.authToken ||
+    cachedCredentials.frameId !== fresh.frameId
+  )) {
+    skylightClient = null;
+    mcpServer = null;
+  }
+
+  cachedCredentials = fresh;
   return cachedCredentials;
 }
 
