@@ -38,7 +38,7 @@ export class SkylightClient {
     const headers: Record<string, string> = {
       "Accept": "application/json",
       "Authorization": this.authToken,
-      "User-Agent": "SkylightMobile/1.95.2 (ios 26.2)",
+      "User-Agent": "SkylightMobile/2.3.0 (ios 26.3.1)",
       "Accept-Language": "en-US,en;q=0.9",
     };
 
