@@ -22,15 +22,15 @@
     "node": ">=24"
   },
   "dependencies": {
-    "@aws-sdk/client-secrets-manager": "^3.1032.0",
+    "@aws-sdk/client-secrets-manager": "^3.1037.0",
     "@modelcontextprotocol/sdk": "^1.27.1",
-    "aws-cdk-lib": "^2.244.0",
+    "aws-cdk-lib": "^2.251.0",
     "constructs": "^10.4.5",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
-    "aws-cdk": "^2.1118.2",
+    "aws-cdk": "^2.1119.0",
     "esbuild": "^0.28.0",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3"
