@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-> **ACTIVE BLOCKER:** Bearer token 401 since 2026-05-04; pending Proxyman re-capture per priority #13.
+> **ACTIVE BLOCKER:** Bearer token 401 since 2026-05-04; pending Proxyman re-capture (status as of 2026-05-08; verify before relying on). Priority: see `Context/current-priorities.md`.
 
 ## Project Overview
 
