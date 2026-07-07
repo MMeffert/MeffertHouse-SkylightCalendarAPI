@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **ACTIVE BLOCKER:** Bearer token 401 since 2026-05-04; pending Proxyman re-capture (status as of 2026-05-08; verify before relying on). Priority: see `Context/current-priorities.md`.
+
 ## Project Overview
 
 MCP (Model Context Protocol) server that enables Claude to manage chores on a Skylight Calendar digital display. Deployed as an AWS Lambda with Function URL, using OAuth 2.0 with PKCE for authentication.
@@ -68,7 +70,7 @@ AWS_PROFILE=personal aws logs tail /aws/lambda/SkylightMcpStack-SkylightMcpFunct
 
 - Mobile app (v1.95+) uses `/api/frames/{frameId}/chores/create_multiple` with flat JSON, not JSON:API wrapper
 - PUT requests for updates also use flat JSON body
-- Auth header: `Basic {token}` (captured via Proxyman from mobile app)
+- Auth header: `Authorization: Bearer {token}` (token captured via Proxyman from mobile app; the captured value already includes the `Bearer ` prefix and is sent verbatim by the client). Skylight gates on User-Agent: requests must spoof `SkylightMobile/2.3.0 (ios 26.3.1)` (see `src/skylight/client.ts`)
 - `recurrence_set` must be an array of RRULE strings: `["FREQ=WEEKLY;BYDAY=MO,WE,FR"]`
 - Chore ID formats:
   - One-time chores: `61009429`
@@ -79,7 +81,7 @@ AWS_PROFILE=personal aws logs tail /aws/lambda/SkylightMcpStack-SkylightMcpFunct
 
 - **Account:** 241654197557 (personal)
 - **Region:** us-east-1
-- **Runtime:** Node.js 24 (Lambda)
+- **Runtime:** Node.js 24 (Lambda) — explicitly pinned to current rather than 22 LTS in `infra/stack.ts` and `ci.yml`; this is intentional, not the default. Revisit pin choice when AWS Lambda announces a Node 24 deprecation date
 - **Secret:** `skylight-mcp/credentials` contains:
   - `SKYLIGHT_AUTH_TOKEN` - Skylight auth token
   - `SKYLIGHT_FRAME_ID` - Household frame ID
