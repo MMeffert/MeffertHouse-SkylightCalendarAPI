@@ -6,8 +6,10 @@ const app = new cdk.App();
 
 new SkylightMcpStack(app, "SkylightMcpStack", {
   env: {
-    account: "241654197557",
-    region: "us-east-1",
+    // Resolved from your AWS credentials at synth/deploy time (CDK sets these
+    // from the active profile) -- no account number is hardcoded in this repo.
+    account: process.env.CDK_DEFAULT_ACCOUNT,
+    region: process.env.CDK_DEFAULT_REGION || "us-east-1",
   },
   tags: {
     Application: "SkylightMCP",

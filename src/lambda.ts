@@ -677,7 +677,7 @@ export async function handler(
                 time: { type: "string", description: "Optional time in HH:MM format (24-hour)" },
                 category_id: {
                   type: "string",
-                  description: "Family member ID (numeric) OR name to assign the chore to. Get IDs from list_categories. Example: '123' or 'Elliot'",
+                  description: "Family member ID (numeric) OR name to assign the chore to. Get IDs from list_categories. Example: '123' or 'Alex'",
                 },
                 emoji_icon: { type: "string", description: "Emoji icon for the chore (helps young kids). Example: '🧹' or '🦷'" },
                 recurring: { type: "boolean", default: false },

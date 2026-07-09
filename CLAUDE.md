@@ -2,8 +2,6 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-> **ACTIVE BLOCKER:** Bearer token 401 since 2026-05-04; pending Proxyman re-capture (status as of 2026-05-08; verify before relying on). Priority: see `Context/current-priorities.md`.
-
 ## Project Overview
 
 MCP (Model Context Protocol) server that enables Claude to manage chores on a Skylight Calendar digital display. Deployed as an AWS Lambda with Function URL, using OAuth 2.0 with PKCE for authentication.
@@ -79,7 +77,7 @@ AWS_PROFILE=personal aws logs tail /aws/lambda/SkylightMcpStack-SkylightMcpFunct
 
 ## AWS Configuration
 
-- **Account:** 241654197557 (personal)
+- **Account:** resolved from your AWS profile at deploy time (`CDK_DEFAULT_ACCOUNT`) -- not hardcoded
 - **Region:** us-east-1
 - **Runtime:** Node.js 24 (Lambda) — explicitly pinned to current rather than 22 LTS in `infra/stack.ts` and `ci.yml`; this is intentional, not the default. Revisit pin choice when AWS Lambda announces a Node 24 deprecation date
 - **Secret:** `skylight-mcp/credentials` contains:
