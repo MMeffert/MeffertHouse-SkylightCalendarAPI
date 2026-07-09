@@ -89,14 +89,15 @@ export class SkylightMcpStack extends cdk.Stack {
     skylightSecret.grantRead(refresherFunction);
     skylightSecret.grantWrite(refresherFunction);
 
-    // Weekly schedule: Sunday 03:00 US/Central (= 08:00 or 09:00 UTC depending on DST)
+    // Daily schedule: 09:00 UTC. Daily (not weekly) because the Skylight session
+    // token empirically expires within days -- a weekly cadence left a multi-day
+    // outage gap (token died ~2026-07-04, first weekly run wasn't until 2026-07-12).
     const refreshSchedule = new events.Rule(this, "SkylightTokenRefreshSchedule", {
       schedule: events.Schedule.cron({
         minute: "0",
         hour: "9",
-        weekDay: "SUN",
       }),
-      description: "Weekly Skylight token refresh (Sun 03:00 Central)",
+      description: "Daily Skylight token refresh (09:00 UTC)",
     });
 
     refreshSchedule.addTarget(new targets.LambdaFunction(refresherFunction, {
