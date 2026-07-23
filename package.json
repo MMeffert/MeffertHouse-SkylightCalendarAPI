@@ -29,10 +29,10 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "^25.9.5",
+    "@types/node": "^26.1.1",
     "aws-cdk": "^2.1132.1",
     "esbuild": "^0.28.1",
     "tsx": "^4.23.1",
-    "typescript": "^6.0.3"
+    "typescript": "^7.0.2"
   }
 }
