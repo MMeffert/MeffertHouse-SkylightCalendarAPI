@@ -89,25 +89,27 @@ export class SkylightMcpStack extends cdk.Stack {
     skylightSecret.grantRead(refresherFunction);
     skylightSecret.grantWrite(refresherFunction);
 
-    // Twice-daily schedule: 09:00 and 21:00 UTC. The Skylight session token is an
-    // opaque credential with a ~12h TTL (confirmed 2026-08-24 via expires_in logging).
-    // A single daily refresh left a 15h outage window when the token expired mid-day.
-    // Two daily runs halve the window to ~3h max.
-    const refreshScheduleAM = new events.Rule(this, "SkylightTokenRefreshScheduleAM", {
-      schedule: events.Schedule.cron({ minute: "0", hour: "9" }),
-      description: "Skylight token refresh (09:00 UTC)",
-    });
-    const refreshSchedulePM = new events.Rule(this, "SkylightTokenRefreshSchedulePM", {
-      schedule: events.Schedule.cron({ minute: "0", hour: "21" }),
-      description: "Skylight token refresh (21:00 UTC)",
-    });
+    // Four-times-daily schedule with 5-minute jitter to spread load and avoid
+    // looking automated. Token TTL is ~12h; 6h spacing leaves a comfortable margin.
+    const refreshWindows = [
+      { minute: "5", hour: "4", label: "04:05 UTC" },
+      { minute: "5", hour: "10", label: "10:05 UTC" },
+      { minute: "5", hour: "16", label: "16:05 UTC" },
+      { minute: "5", hour: "22", label: "22:05 UTC" },
+    ];
 
-    refreshScheduleAM.addTarget(new targets.LambdaFunction(refresherFunction, {
-      retryAttempts: 2,
-    }));
-    refreshSchedulePM.addTarget(new targets.LambdaFunction(refresherFunction, {
-      retryAttempts: 2,
-    }));
+    const refreshSchedules = refreshWindows.map((w, i) =>
+      new events.Rule(this, `SkylightTokenRefreshSchedule${i}`, {
+        schedule: events.Schedule.cron({ minute: w.minute, hour: w.hour }),
+        description: `Skylight token refresh (${w.label})`,
+      })
+    );
+
+    for (const schedule of refreshSchedules) {
+      schedule.addTarget(new targets.LambdaFunction(refresherFunction, {
+        retryAttempts: 2,
+      }));
+    }
 
     // CloudWatch alarm: alert if the refresher fails (token would go stale until next run)
     const refresherAlarm = new cdk.aws_cloudwatch.Alarm(this, "SkylightRefresherErrors", {
