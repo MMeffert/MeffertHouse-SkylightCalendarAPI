@@ -89,20 +89,34 @@ export class SkylightMcpStack extends cdk.Stack {
     skylightSecret.grantRead(refresherFunction);
     skylightSecret.grantWrite(refresherFunction);
 
-    // Daily schedule: 09:00 UTC. Daily (not weekly) because the Skylight session
-    // token empirically expires within days -- a weekly cadence left a multi-day
-    // outage gap (token died ~2026-07-04, first weekly run wasn't until 2026-07-12).
-    const refreshSchedule = new events.Rule(this, "SkylightTokenRefreshSchedule", {
-      schedule: events.Schedule.cron({
-        minute: "0",
-        hour: "9",
-      }),
-      description: "Daily Skylight token refresh (09:00 UTC)",
+    // Twice-daily schedule: 09:00 and 21:00 UTC. The Skylight session token is an
+    // opaque credential with a ~12h TTL (confirmed 2026-08-24 via expires_in logging).
+    // A single daily refresh left a 15h outage window when the token expired mid-day.
+    // Two daily runs halve the window to ~3h max.
+    const refreshScheduleAM = new events.Rule(this, "SkylightTokenRefreshScheduleAM", {
+      schedule: events.Schedule.cron({ minute: "0", hour: "9" }),
+      description: "Skylight token refresh (09:00 UTC)",
+    });
+    const refreshSchedulePM = new events.Rule(this, "SkylightTokenRefreshSchedulePM", {
+      schedule: events.Schedule.cron({ minute: "0", hour: "21" }),
+      description: "Skylight token refresh (21:00 UTC)",
     });
 
-    refreshSchedule.addTarget(new targets.LambdaFunction(refresherFunction, {
+    refreshScheduleAM.addTarget(new targets.LambdaFunction(refresherFunction, {
       retryAttempts: 2,
     }));
+    refreshSchedulePM.addTarget(new targets.LambdaFunction(refresherFunction, {
+      retryAttempts: 2,
+    }));
+
+    // CloudWatch alarm: alert if the refresher fails (token would go stale until next run)
+    const refresherAlarm = new cdk.aws_cloudwatch.Alarm(this, "SkylightRefresherErrors", {
+      metric: refresherFunction.metricErrors(),
+      threshold: 0,
+      evaluationPeriods: 1,
+      datapointsToAlarm: 1,
+      treatMissingData: cdk.aws_cloudwatch.TreatMissingData.NOTBreaching,
+    });
 
     // Outputs
     new cdk.CfnOutput(this, "McpEndpointUrl", {
