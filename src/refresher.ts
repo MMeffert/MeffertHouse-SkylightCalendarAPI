@@ -220,11 +220,22 @@ async function skylightLogin(
   if (resp.status !== 200) {
     throw new Error(`Token exchange failed: HTTP ${resp.status}`);
   }
-  const tokenData = (await resp.json()) as { access_token?: string; token?: string };
+  const tokenData = (await resp.json()) as {
+    access_token?: string;
+    token?: string;
+    expires_in?: number;
+    refresh_token?: string;
+  };
   const accessToken = tokenData.access_token || tokenData.token;
   if (!accessToken) {
     throw new Error("Token exchange did not return an access_token");
   }
+
+  console.log(
+    "Token minted — expires_in=%s, has_refresh_token=%s",
+    tokenData.expires_in ?? "NOT_PRESENT",
+    tokenData.refresh_token ? "yes" : "no"
+  );
 
   return accessToken;
 }

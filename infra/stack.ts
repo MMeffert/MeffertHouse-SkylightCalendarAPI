@@ -89,20 +89,36 @@ export class SkylightMcpStack extends cdk.Stack {
     skylightSecret.grantRead(refresherFunction);
     skylightSecret.grantWrite(refresherFunction);
 
-    // Daily schedule: 09:00 UTC. Daily (not weekly) because the Skylight session
-    // token empirically expires within days -- a weekly cadence left a multi-day
-    // outage gap (token died ~2026-07-04, first weekly run wasn't until 2026-07-12).
-    const refreshSchedule = new events.Rule(this, "SkylightTokenRefreshSchedule", {
-      schedule: events.Schedule.cron({
-        minute: "0",
-        hour: "9",
-      }),
-      description: "Daily Skylight token refresh (09:00 UTC)",
-    });
+    // Four-times-daily schedule with 5-minute jitter to spread load and avoid
+    // looking automated. Token TTL is ~12h; 6h spacing leaves a comfortable margin.
+    const refreshWindows = [
+      { minute: "5", hour: "4", label: "04:05 UTC" },
+      { minute: "5", hour: "10", label: "10:05 UTC" },
+      { minute: "5", hour: "16", label: "16:05 UTC" },
+      { minute: "5", hour: "22", label: "22:05 UTC" },
+    ];
 
-    refreshSchedule.addTarget(new targets.LambdaFunction(refresherFunction, {
-      retryAttempts: 2,
-    }));
+    const refreshSchedules = refreshWindows.map((w, i) =>
+      new events.Rule(this, `SkylightTokenRefreshSchedule${i}`, {
+        schedule: events.Schedule.cron({ minute: w.minute, hour: w.hour }),
+        description: `Skylight token refresh (${w.label})`,
+      })
+    );
+
+    for (const schedule of refreshSchedules) {
+      schedule.addTarget(new targets.LambdaFunction(refresherFunction, {
+        retryAttempts: 2,
+      }));
+    }
+
+    // CloudWatch alarm: alert if the refresher fails (token would go stale until next run)
+    const refresherAlarm = new cdk.aws_cloudwatch.Alarm(this, "SkylightRefresherErrors", {
+      metric: refresherFunction.metricErrors(),
+      threshold: 0,
+      evaluationPeriods: 1,
+      datapointsToAlarm: 1,
+      treatMissingData: cdk.aws_cloudwatch.TreatMissingData.NOTBreaching,
+    });
 
     // Outputs
     new cdk.CfnOutput(this, "McpEndpointUrl", {
