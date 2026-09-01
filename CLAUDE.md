@@ -51,6 +51,7 @@ AWS_PROFILE=personal aws logs tail /aws/lambda/SkylightMcpStack-SkylightMcpFunct
 | `src/skylight/client.ts` | Skylight API client - all HTTP calls to `app.ourskylight.com` |
 | `src/skylight/types.ts` | TypeScript types matching Skylight's JSON:API format |
 | `src/tools/index.ts` | MCP tool definitions with Zod schemas (used for SDK registration) |
+| `src/refresher.ts` | Daily token auto-refresh Lambda -- the reason the fragile captured Skylight session token keeps working. After a refresh, the MCP Lambda caches credentials ~5 min, so retry a post-refresh 401 once before concluding failure |
 | `infra/stack.ts` | CDK stack: Lambda, Function URL, Secrets Manager permissions |
 
 ### MCP Tools
@@ -88,6 +89,6 @@ AWS_PROFILE=personal aws logs tail /aws/lambda/SkylightMcpStack-SkylightMcpFunct
 
 ## Known Issues
 
-1. **In-memory OAuth codes** (`lambda.ts:77`) - Auth codes stored in `Map` won't persist across Lambda instances. Production fix: use DynamoDB with TTL.
+1. **In-memory OAuth codes** (the auth-code `Map` in `lambda.ts`) - Auth codes stored in `Map` won't persist across Lambda instances. Production fix: use DynamoDB with TTL.
 
 2. **Duplicate tool definitions** - Tools defined in both `lambda.ts` (for `tools/list` response) and `tools/index.ts` (SDK registration). These should be consolidated to a single source of truth.
