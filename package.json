@@ -22,17 +22,17 @@
     "node": ">=24"
   },
   "dependencies": {
-    "@aws-sdk/client-secrets-manager": "^3.1120.0",
+    "@aws-sdk/client-secrets-manager": "^3.1126.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "aws-cdk-lib": "^2.267.0",
+    "aws-cdk-lib": "^2.268.0",
     "constructs": "^10.8.1",
-    "zod": "^4.4.3"
+    "zod": "^4.5.4"
   },
   "devDependencies": {
-    "@types/node": "^26.4.0",
+    "@types/node": "^26.4.1",
     "aws-cdk": "^2.1139.0",
     "esbuild": "^0.28.2",
-    "tsx": "^4.23.12",
+    "tsx": "^4.23.13",
     "typescript": "^7.0.2"
   },
   "allowScripts": {
